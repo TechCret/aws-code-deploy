@@ -1,0 +1,53 @@
+#  Template Java Gradle build
+
+#  This template allows you to test and build your Java project with Gradle.
+#  The workflow allows running tests, code checkstyle and security scans on the default branch.
+
+# Prerequisites: appropriate project structure should exist in the repository.
+
+image: gradle:6.6.0
+
+pipelines:
+  default:
+    - parallel:
+      - step:
+          name: Build and Test
+          caches:
+            - gradle
+          script:
+            - apt-get update
+            - apt-get install zip
+            - gradle clean
+            - gradle build
+            - zip $(pwd)/build/libs/aws-codedeploy.zip build/libs/* appspec.yml scripts/* docker/*
+            - rm build/libs/aws-codedeploy-0.0.1-SNAPSHOT.jar
+          artifacts: # defining the artifacts to be passed to each future step.
+            - build/libs/*
+#          after-script:
+#            - pipe: atlassian/checkstyle-report:0.2.0
+      - step:
+          name: Security Scan
+          script:
+            # Run a security scan for sensitive data.
+            # See more security tools at https://bitbucket.org/product/features/pipelines/integrations?&category=security
+            - pipe: atlassian/git-secrets-scan:0.4.3
+
+    - step:
+        name: AWS S3 Upload
+        script:
+          - pipe: atlassian/aws-s3-deploy:0.4.5
+            variables:
+              AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID # Optional if already defined in the context.
+              AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY # Optional if already defined in the context.
+              AWS_DEFAULT_REGION: 'ap-south-1' # Optional if already defined in the context.
+              S3_BUCKET: $S3_BUCKET
+              LOCAL_PATH: 'build/libs/'
+              # CONTENT_ENCODING: '<string>' # Optional.
+              # ACL: '<string>' # Optional.
+              # STORAGE_CLASS: '<string>' # Optional.
+              # CACHE_CONTROL: '<string>' # Optional.
+              # EXPIRES: '<timestamp>' # Optional.
+              # DELETE_FLAG: '<boolean>' # Optional.
+              # EXTRA_ARGS: '<string>' # Optional.
+              DEBUG: 'false' # Optional.
+
